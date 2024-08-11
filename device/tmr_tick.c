@@ -10,6 +10,8 @@
 
 static volatile uint16_t tmr_1ms_tick = 0;
 
+volatile uint8_t tmr_10ms_flag;
+
 // Create a 1ms timer tick
 // Fosc is 16MHz for Arduino nano
 void tmr_tick_init(void)
@@ -29,6 +31,10 @@ void tmr_tick_init(void)
 ISR (TIMER0_OVF_vect)
 {
     tmr_1ms_tick++;
+
+    if (tmr_1ms_tick >= 10) {
+        tmr_10ms_flag = 1;
+    }
 
     TCNT0 = TMR_RST_VAL;
 
