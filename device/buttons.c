@@ -4,8 +4,8 @@
 #include <stdio.h>
 
 #define NUM_BTNS            6
-#define DEBOUNCE_COUNT      10
-#define RELEASED_COUNT      5
+#define DEBOUNCE_COUNT      5
+#define RELEASED_COUNT      3
 #define LONGPRESS_COUNT     20
 
 // save button states
