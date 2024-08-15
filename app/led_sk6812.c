@@ -5,6 +5,7 @@
 
 #include "led_sk6812.h"
 #include "led_commands.h"
+#include "led_patterns.h"
 #include "../device/adc.h"
 #include "../device/buttons.h"
 #include "../device/interrupts.h"
@@ -12,9 +13,6 @@
 
 #define LEVEL_INCREMENT 5
 #define LEVEL_DECREMENT 1
-
-// 4 LEDs per "pixel"
-#define PATTERN_NUM_LEDS        15
 
 // saved LED levels
 static uint8_t red_level;
@@ -27,14 +25,12 @@ static uint8_t brightness;
 static enum LED_PATTERN pattern;
 
 // led pattern colors
-uint8_t pattern_r[PATTERN_NUM_LEDS], pattern_g[PATTERN_NUM_LEDS], pattern_b[PATTERN_NUM_LEDS];
+uint8_t pattern_r[PATTERN_NUM_LEDS], pattern_g[PATTERN_NUM_LEDS],
+        pattern_b[PATTERN_NUM_LEDS], pattern_w[PATTERN_NUM_LEDS];
 uint8_t pattern_tmp;
 
 // pattern update tick rate
 uint8_t pattern_update_tick;
-
-// pre-set patterns
-const uint16_t pattern_christmas[3] = {0xAAAA, 0x5555, 0x0}; // alternating sets of red & green
 
 // increment decrement with check
 static uint8_t led_update_level(uint8_t lvl, bool increment, uint8_t max_lvl)
@@ -178,24 +174,24 @@ void led_sk6812_set_color_all(uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 void led_sk6812_write_pattern()
 {
     // local pattern copy to speed up execution
-    uint8_t r[NUM_LEDS], g[NUM_LEDS], b[NUM_LEDS];
+    uint8_t r[NUM_LEDS], g[NUM_LEDS], b[NUM_LEDS], w[NUM_LEDS];
     uint8_t led;
 
     // copy the pattern
     for (led = 0; led < PATTERN_NUM_LEDS; led++)
     {
-        r[led] = brightness * pattern_r[led];
-        g[led] = brightness * pattern_g[led];
-        b[led] = brightness * pattern_b[led];
+        r[led] = brightness * pattern_r[led] / 100;
+        g[led] = brightness * pattern_g[led] / 100;
+        b[led] = brightness * pattern_b[led] / 100;
+        w[led] = brightness * pattern_w[led] / 100;
     }
 
     interrupts_disable();
 
     for (led = 0; led < PATTERN_NUM_LEDS; led++) {
-        led_sk6812_set_color_single(r[led], g[led], b[led], 0);
-        led_sk6812_set_color_single(r[led], g[led], b[led], 0);
-        led_sk6812_set_color_single(r[led], g[led], b[led], 0);
-        led_sk6812_set_color_single(r[led], g[led], b[led], 0);
+        led_sk6812_set_color_single(r[led], g[led], b[led], w[led]);
+        led_sk6812_set_color_single(r[led], g[led], b[led], w[led]);
+        led_sk6812_set_color_single(r[led], g[led], b[led], w[led]);
     }
 
     // transmit comms reset sequence
@@ -292,9 +288,10 @@ void led_sk6812_task(void)
         {
             // load data for first time
             for (uint8_t led = 0; led < PATTERN_NUM_LEDS; led++) {
-                pattern_r[led] = (pattern_christmas[0] & (1 << led)) >> led;
-                pattern_g[led] = (pattern_christmas[1] & (1 << led)) >> led;
-                pattern_b[led] = (pattern_christmas[2] & (1 << led)) >> led;
+                pattern_r[led] = pattern_christmas[led][0];
+                pattern_g[led] = pattern_christmas[led][1];
+                pattern_b[led] = pattern_christmas[led][2];
+                pattern_w[led] = pattern_christmas[led][3];
 
                 // printf("R: 0x%X\t G: 0x%X\r\n ----- \r\n", pattern_r[led], pattern_g[led]);
             }
@@ -311,6 +308,8 @@ void led_sk6812_task(void)
                 pattern_tmp = pattern_r[led];
                 pattern_r[led] = pattern_g[led];
                 pattern_g[led] = pattern_tmp;
+
+                printf("R: 0x%X\t G: 0x%X\r\n ----- \r\n", pattern_r[led], pattern_g[led]);
             }
 
             // write data to LEDs
