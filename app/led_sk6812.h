@@ -8,9 +8,11 @@
 
 enum LED_PATTERN {
     LED_STATIC,
+    LED_WARM_WHITE,
     LED_CHRISTMAS,
     LED_DIWALI,
     LED_FAKE_FIRE,
+    LED_PATTERN_LAST
 };
 
 void led_sk6812_init(void);
