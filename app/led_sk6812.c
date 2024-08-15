@@ -383,6 +383,18 @@ void led_sk6812_task(void)
         break;
 
     case LED_FAKE_FIRE:
+            // set random brightness every 50ms
+            pattern_update_tick++;
+            if (true == pattern_changed) {
+                led_sk6812_set_color_all(80, 10, 0, 10);
+                pattern_changed = false;
+            }
+
+            if (pattern_update_tick >= 5) {
+                brightness = 150 + (rand() % 20);
+                led_sk6812_set_color_all(80, 10, 0, 10);
+                pattern_update_tick = 0;
+            }
         break;
 
     default:
