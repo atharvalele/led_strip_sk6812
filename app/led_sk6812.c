@@ -2,6 +2,7 @@
 #include "util/delay.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "led_sk6812.h"
 #include "led_commands.h"
@@ -64,6 +65,32 @@ static uint8_t led_update_level(uint8_t lvl, bool increment, uint8_t max_lvl)
     }
 
     return (uint8_t)tmp_lvl;
+}
+
+// rotate pattern
+void led_rotate_pattern(uint8_t rotate_amt)
+{
+    uint8_t r_last, g_last, b_last, w_last;
+
+    for (uint8_t i = 0; i < rotate_amt; i++) {
+        r_last = pattern_r[0];
+        g_last = pattern_g[0];
+        b_last = pattern_b[0];
+        w_last = pattern_w[0];
+
+        for (uint8_t j = 0; j < PATTERN_NUM_LEDS - 1; j++) {
+            pattern_r[j] = pattern_r[j + 1];
+            pattern_g[j] = pattern_g[j + 1];
+            pattern_b[j] = pattern_b[j + 1];
+            pattern_w[j] = pattern_w[j + 1];
+        }
+
+        pattern_r[PATTERN_NUM_LEDS - 1] = r_last;
+        pattern_g[PATTERN_NUM_LEDS - 1] = g_last;
+        pattern_b[PATTERN_NUM_LEDS - 1] = b_last;
+        pattern_w[PATTERN_NUM_LEDS - 1] = w_last;
+
+    }
 }
 
 // initialize LED strip and maintain in reset
@@ -329,6 +356,30 @@ void led_sk6812_task(void)
         break;
 
     case LED_DIWALI:
+            if (true == pattern_changed) {
+                // load data for first time
+                for (uint8_t led = 0; led < PATTERN_NUM_LEDS; led++) {
+                    pattern_r[led] = pattern_diwali[led][0];
+                    pattern_g[led] = pattern_diwali[led][1];
+                    pattern_b[led] = pattern_diwali[led][2];
+                    pattern_w[led] = pattern_diwali[led][3];
+                }
+
+                pattern_changed = 0;
+            }
+
+            if (true == brightness_changed) {
+                brightness_changed = false;
+            }
+
+            // update pattern for next iteration, change every 100 ticks
+            pattern_update_tick++;
+            if (pattern_update_tick >= 100) {
+                // rotate array by N random places (N between 0 to 20)
+                led_rotate_pattern(rand() % 20);
+
+                led_sk6812_write_pattern();
+            }
         break;
 
     case LED_FAKE_FIRE:
