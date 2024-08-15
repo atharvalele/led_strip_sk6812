@@ -212,6 +212,7 @@ void led_sk6812_write_pattern()
 void led_sk6812_task(void)
 {
     bool pattern_changed = false;
+    bool brightness_changed = false;
 
     // check for pattern change
     if (BUTTON_RELEASED == btn_get(5))
@@ -230,10 +231,12 @@ void led_sk6812_task(void)
     if (BUTTON_RELEASED == btn_get(4))
     {
         brightness = led_update_level(brightness, true, 255);
+        brightness_changed = true;
     }
     else if (BUTTON_LONG_PRESSED == btn_get(4))
     {
         brightness = led_update_level(brightness, false, 255);
+        brightness_changed = true;
     }
 
     // execute pattern code
@@ -283,6 +286,16 @@ void led_sk6812_task(void)
 
         break;
 
+    case LED_WARM_WHITE:
+        if ((true == pattern_changed) || (true == brightness_changed)) {
+            // write data to LEDs
+            led_sk6812_set_color_all(20, 0, 10, 100);
+
+            pattern_changed = false;
+            brightness_changed = false;
+        }
+    break;
+
     case LED_CHRISTMAS:
         if (true == pattern_changed)
         {
@@ -292,8 +305,6 @@ void led_sk6812_task(void)
                 pattern_g[led] = pattern_christmas[led][1];
                 pattern_b[led] = pattern_christmas[led][2];
                 pattern_w[led] = pattern_christmas[led][3];
-
-                // printf("R: 0x%X\t G: 0x%X\r\n ----- \r\n", pattern_r[led], pattern_g[led]);
             }
 
             pattern_changed = 0;
