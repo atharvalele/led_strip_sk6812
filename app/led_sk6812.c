@@ -9,6 +9,7 @@
 #include "led_patterns.h"
 #include "../device/adc.h"
 #include "../device/buttons.h"
+#include "../device/eeprom.h"
 #include "../device/interrupts.h"
 #include "../device/led.h"
 
@@ -33,6 +34,67 @@ uint8_t pattern_tmp;
 
 // pattern update tick rate
 uint8_t pattern_update_tick;
+
+// time since last update
+static bool init_success = false;
+uint8_t data_save_tick;
+bool data_updated;
+
+// read saved LED data
+static bool led_savedata_read(void)
+{
+    uint8_t chksum_eeprom, chksum_calc = 0;
+    // uint8_t save_pattern,
+    //         save_bright,
+    //         save_r, save_g, save_b, save_w,
+    //         save_fire_bright;
+
+    uint8_t data[LED_SAVE_FIRE_BRIGHT+1];
+
+    // start reading
+    chksum_eeprom = eeprom_read(LED_SAVE_CHECKSUM);
+    for (uint8_t addr = LED_SAVE_PATTERN; addr <= LED_SAVE_FIRE_BRIGHT; addr++) {
+        data[addr] = eeprom_read(addr);
+        chksum_calc += data[addr];
+    }
+
+    printf("Reading: chksum eeprom = 0x%X \t chksum calc = 0x%X\r\n", chksum_eeprom, chksum_calc);
+
+    // validate checksum, if OK then set values return true, else return false
+    if (chksum_calc == chksum_eeprom) {
+        pattern =           data[LED_SAVE_PATTERN];
+        brightness =        data[LED_SAVE_BRIGHT];
+        red_level =         data[LED_SAVE_R];
+        green_level =       data[LED_SAVE_G];
+        blue_level =        data[LED_SAVE_B];
+        white_level =       data[LED_SAVE_W];
+        fire_brightness =   data[LED_SAVE_FIRE_BRIGHT];
+
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// save data to EEPROM
+static void led_savedata_write(void)
+{
+    uint8_t chksum = 0;
+    chksum = pattern + brightness + red_level + green_level + blue_level + white_level \
+                + fire_brightness;
+
+    // write all to eeprom
+    eeprom_write(LED_SAVE_CHECKSUM, chksum);
+    eeprom_write(LED_SAVE_PATTERN, pattern);
+    eeprom_write(LED_SAVE_BRIGHT, brightness);
+    eeprom_write(LED_SAVE_R, red_level);
+    eeprom_write(LED_SAVE_G, green_level);
+    eeprom_write(LED_SAVE_B, blue_level);
+    eeprom_write(LED_SAVE_W, white_level);
+    eeprom_write(LED_SAVE_FIRE_BRIGHT, fire_brightness);
+
+    printf("Writing: chksum = 0x%X\r\n", chksum);
+}
 
 // increment decrement with check
 static uint8_t led_update_level(uint8_t lvl, bool increment, uint8_t max_lvl)
@@ -64,6 +126,9 @@ static uint8_t led_update_level(uint8_t lvl, bool increment, uint8_t max_lvl)
             tmp_lvl = 0;
         }
     }
+
+    data_updated = true;
+    data_save_tick = 0;
 
     return (uint8_t)tmp_lvl;
 }
@@ -100,16 +165,28 @@ void led_sk6812_init(void)
     // set pin as output
     DDRB |= (1 << DDB3);
 
-    // set static pattern
-    pattern = LED_STATIC;
+    // load data from EEPROM, else set defaults
+    if (false == led_savedata_read()) {
 
-    // initial brightness
-    brightness = 20;
-    fire_brightness = 150;
+        // set static pattern
+        pattern = LED_STATIC;
 
-    // set all colors to zero initially
-    // essentially turning the strip off
-    led_sk6812_set_color_all(0, 0, 0, 0);
+        // initial brightness
+        brightness = 20;
+        fire_brightness = 150;
+
+        // set all colors to zero initially
+        // essentially turning the strip off
+        led_sk6812_set_color_all(0, 0, 0, 0);
+
+        init_success = false;
+        data_updated = true;
+    } else {
+        init_success = true;
+    }
+
+    data_save_tick = 0;
+    data_updated = false;
 }
 
 // Note that this function assumes interrupts have been disabled prior to calling
@@ -243,6 +320,15 @@ void led_sk6812_task(void)
     bool pattern_changed = false;
     bool brightness_changed = false;
 
+    // check if init
+    if (true == init_success) {
+        // force update
+        pattern_changed = true;
+        brightness_changed = true;
+
+        init_success = false;
+    }
+
     // check for pattern change
     if (BUTTON_RELEASED == btn_get(5))
     {
@@ -254,6 +340,9 @@ void led_sk6812_task(void)
         {
             pattern = LED_STATIC;
         }
+
+        data_updated = true;
+        data_save_tick = 0;
     }
 
     // check brightness change
@@ -403,5 +492,22 @@ void led_sk6812_task(void)
 
     default:
         break;
+    }
+}
+
+void led_savedata_task(void)
+{
+    if (true == data_updated) {
+        data_save_tick++;
+
+        // save after 5 seconds
+        if (data_save_tick >= 5) {
+            onboard_led_on();
+            led_savedata_write();
+            printf("Data saved to EEPROM!\r\n");
+            data_updated = false;
+            data_save_tick = 0;
+            onboard_led_off();
+        }
     }
 }

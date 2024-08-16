@@ -46,6 +46,7 @@ int main(void)
 
         // 1s tasks
         if (tmr_1s_flag) {
+            led_savedata_task();
 
             tmr_1s_flag = 0;
         }
