@@ -21,6 +21,7 @@ static uint8_t blue_level;
 static uint8_t green_level;
 static uint8_t white_level;
 static uint8_t brightness;
+static uint8_t fire_brightness;
 
 // saved pattern
 static enum LED_PATTERN pattern;
@@ -104,6 +105,7 @@ void led_sk6812_init(void)
 
     // initial brightness
     brightness = 20;
+    fire_brightness = 150;
 
     // set all colors to zero initially
     // essentially turning the strip off
@@ -246,7 +248,7 @@ void led_sk6812_task(void)
     {
         pattern++;
         pattern_changed = true;
-        pattern_update_tick = 0;
+        pattern_update_tick = 254;
         // rollover
         if (pattern >= LED_PATTERN_LAST)
         {
@@ -259,11 +261,15 @@ void led_sk6812_task(void)
     {
         brightness = led_update_level(brightness, true, 255);
         brightness_changed = true;
+
+        fire_brightness = led_update_level(fire_brightness, true, 230);
     }
     else if (BUTTON_LONG_PRESSED == btn_get(4))
     {
         brightness = led_update_level(brightness, false, 255);
         brightness_changed = true;
+
+        fire_brightness = led_update_level(fire_brightness, false, 50);
     }
 
     // execute pattern code
@@ -339,15 +345,13 @@ void led_sk6812_task(void)
 
         // update pattern for next iteration, change every 100 ticks
         pattern_update_tick++;
-        if (pattern_update_tick >= 100)
+        if (pattern_update_tick > 150)
         {
             // swap red & green values
             for (uint8_t led = 0; led < PATTERN_NUM_LEDS; led++) {
                 pattern_tmp = pattern_r[led];
                 pattern_r[led] = pattern_g[led];
                 pattern_g[led] = pattern_tmp;
-
-                printf("R: 0x%X\t G: 0x%X\r\n ----- \r\n", pattern_r[led], pattern_g[led]);
             }
 
             // write data to LEDs
@@ -390,8 +394,8 @@ void led_sk6812_task(void)
                 pattern_changed = false;
             }
 
-            if (pattern_update_tick >= 5) {
-                brightness = 150 + (rand() % 20);
+            if (pattern_update_tick >= (2 + (rand() % 8))) {
+                brightness = fire_brightness + (rand() % 25);
                 led_sk6812_set_color_all(80, 10, 0, 10);
                 pattern_update_tick = 0;
             }
